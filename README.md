@@ -2,17 +2,39 @@
 
 2025-02 유레카 공학설계입문
 
-Loop가 있는 미로 해결 프로젝트 
+## 프로젝트 소개
+아두이노를 이용해 loop가 있는 미로의 출구를 탐색한다. 
 
-## 1. Theoritial background
-### 1.1. Maze 
-A maze is an nndirected graph $ G = (V, E)$ where start node $s \in V$, exit node $t \in V$
+방향 탐지는 3개의 초음파 센서를 이용하며, Tremaux 탐색 알고리즘을 사용한다.
 
-### 1.2. Exploration path
-A path from $s$ to $t$ is $P = (v_0, v_1, ... v_k)$ where $s = v_0$, $t = v_k$, $(v_i, v_{i+1}) \in E $ s.t. $\forall i \in [0, k]$
+## 왜 Tremaux 인가?
+미로란 방향이 없는 그래프로, 임의의 입구에서 출구를 찾는 과정을 미로를 탐색한다고 한다. 
 
-### 1.3. Loop(cycle)
-A cycle is a sequence $(w_0, w_1, ... , w_m, w_0), \;\; (m\geq 2)$
+미로를 탐색하는 대표적인 방법으로는 left hand rule이 있다. 
 
-### 1.4. Tremaux edge making
-Each edge traking $f: E \to \{0, 1, 2 \}$ count visits
+그러나 미로에 loop가 존재할 경우 탈출을 보장할 수 없다. 
+
+그렇기에 loop가 있는 미로에서는 지나온 edge마다 숫자를 붙인다.
+
+상한 이상으로 edge를 통과할 수 없도록 하면 loop가 제거된다. 
+
+## 프로젝트 구성 
+
+이론 및 알고리즘
+- 그래프 정의, 탐색 알고리즘 고안
+
+HW 설계
+- 회로 구성, HW 검증
+
+센서 및 제어
+- 센서 정확도 검증, 동작 알고리즘 구현
+
+## 팀원 구성
+
+김성현, 김수혁, 김희원, 윤현철, 조우상, 최민지 
+
+
+## Contact
+
+조우상(physiklove@kookmin.ac.kr)
+
