@@ -1,22 +1,21 @@
-#ifndef SMC_CONTROLLER_H
-#define SMC_CONTROLLER_H
+#ifndef SMCController_h
+#define SMCController_h
 
 #include <Arduino.h>
 
 class SMCController {
-private:
-    float lambda;
-    float k;
-    float epsilon;
-    float Ts;
-    float prev_error;
-
-    float sat(float s);
-
 public:
-    SMCController(float lambda_, float k_, float epsilon_, float Ts_);
+    SMCController(float k, float phi, float c1, float c2, float dt = 0.01);
 
-    float update(float error);
+    float update(float reference, float measured);
+
+private:
+    float k;       // switching gain
+    float phi;     // boundary layer thickness
+    float c1, c2;  // sliding surface coefficients
+    float dt;
+
+    float prev_error;
 };
 
 #endif
