@@ -38,7 +38,7 @@ void setup() {
     pinMode(RIGHT_PWM, OUTPUT);
     Serial.begin(9600);
 
-    loadTuning();       // EEPROM에서 λ, K 불러오기
+    loadTuning();               // EEPROM에서 마지막 λ, K 불러오기
     smc.setParameters(lambda, K, phi, dt);
 }
 
@@ -77,11 +77,18 @@ void loop() {
     analogWrite(LEFT_PWM, pwm);
     analogWrite(RIGHT_PWM, pwm);
 
-    // 5. 시리얼 출력 (컴 연결 시 확인 가능)
+    // 5. 시리얼 출력
     Serial.print("dist = "); Serial.print(measured);
-    Serial.print("  pwm = "); Serial.println(pwm);
+    Serial.print("  pwm = "); Serial.print(pwm);
     Serial.print("  lambda = "); Serial.print(lambda);
     Serial.print("  K = "); Serial.println(K);
+
+    // 6. 주행 종료 조건 (기록 배열 가득 찬 경우)
+    if(recordIndex >= MAX_RECORDS){
+        Serial.println("=== 주행 종료: 기록 완료 ===");
+        printRecords();  // CSV 형태 출력
+        while(1){}        // 루프 멈춤
+    }
 
     delay(50);
 }
@@ -112,6 +119,7 @@ void loadTuning(){
 
 // 시리얼로 기록 데이터 확인
 void printRecords(){
+    Serial.println("time_ms,distance_cm");
     for(int i=0; i<recordIndex; i++){
         Serial.print(records[i].t);
         Serial.print(",");
