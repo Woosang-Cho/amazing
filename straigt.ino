@@ -12,11 +12,6 @@
 #define IN3 11
 #define IN4 12
 
-/*
-#define VR_L  A0
-#define VR_K  A1
-*/
-
 
 #define START_BTN 2
 bool started = false;
@@ -49,17 +44,12 @@ void setup() {
     pinMode(IN3, OUTPUT);
     pinMode(IN4, OUTPUT);
 
-    Serial.begin(9600);
     pinMode(START_BTN, INPUT_PULLUP);
 
     digitalWrite(IN1, HIGH);
     digitalWrite(IN2, LOW);
     digitalWrite(IN3, HIGH);
     digitalWrite(IN4, LOW);
-
-    loadTuning();
-    c2 = lambda;
-    smc.setParameters(lambda, K, phi, dt);
 }
 
 void loop() {
@@ -72,14 +62,6 @@ void loop() {
         }
         return;
     }
-/*
-    // 실시간 튜닝(가변저항)
-    lambda = analogRead(VR_L)/1023.0 * 2.0;
-    K = analogRead(VR_K)/1023.0 * 10.0;
-    c2 = lambda;
-    smc.setParameters(lambda, K, phi, dt);
-*/
-
 
     // 초음파 거리 측정 (30ms마다)
     uint32_t now = micros();
@@ -98,7 +80,7 @@ void loop() {
 
     // ---- 최소 PWM 임계값을 적용한 감속 구간 코드 ----
     int base_pwm;
-    if (measured > 20.0) {
+    if (measured > 18.0) {
         base_pwm = 180;
     } else if (measured > ref_distance) {
         base_pwm = MIN_EFFECTIVE_PWM + (measured - ref_distance)/(12.0) * (180 - MIN_EFFECTIVE_PWM);
@@ -118,14 +100,14 @@ void loop() {
 if(measured < 6.0) {
     analogWrite(LEFT_PWM, 0);
     analogWrite(RIGHT_PWM, 0);
-    delay(100);
+    delay(50);
 
     // 오른쪽 90도 회전
     digitalWrite(IN1, HIGH);    // 왼쪽 앞으로
     digitalWrite(IN2, LOW);
     digitalWrite(IN3, LOW);     // 오른쪽 뒤로
     digitalWrite(IN4, HIGH);
-    int turn_pwm = 150;
+    int turn_pwm = 160;
     analogWrite(LEFT_PWM, turn_pwm);
     analogWrite(RIGHT_PWM, turn_pwm);
     delay(650); 
@@ -148,16 +130,3 @@ float readDistance() {
     if(duration == 0) return lastDistance;
     return duration * 0.0343 / 2.0;
 }
-
-/*
-void saveTuning(){
-    EEPROM.put(0, lambda);
-    EEPROM.put(sizeof(lambda), K);
-}
-
-void loadTuning(){
-    EEPROM.get(0, lambda);
-    EEPROM.get(sizeof(lambda), K);
-}
-*/
-
