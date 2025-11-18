@@ -7,35 +7,35 @@
 #define LEFT_PWM 5
 #define RIGHT_PWM 6
 
-#define VR_L  A0  // λ 조절 가변저항
-#define VR_K  A1  // k 조절 가변저항
+#define VR_L  A0
+#define VR_K  A1
 
-#define MAX_RECORDS 128
+#define MAX_RECORDS 96  // (더 줄일 수 있음)
 
 #define START_BTN 2
-bool started = false; // 주행 시작 플래그
+bool started = false;
 
 struct Record {
-    unsigned long t;
-    float distance;
+    uint32_t t;             // 시간(ms)
+    uint16_t distance;      // 0.1cm 단위
 };
 
 Record records[MAX_RECORDS];
-int recordIndex = 0;
+uint8_t recordIndex = 0;    // 0~255면 충분 (uint8_t)
 
 float ref_distance = 20.0;
-unsigned long lastSensorRead = 0;
+uint32_t lastSensorRead = 0;
 float lastDistance = 30.0;
 
-float lambda = 1.0;
-float K      = 30.0;
-float phi    = 0.5;
-float c1     = 1.0; 
-float c2     = lambda; 
-float dt     = 0.01;
+// 튜닝 값
+float lambda;    // EEPROM에서 불러옴
+float K;         // EEPROM에서 불러옴
+const float phi = 0.5;
+const float c1  = 1.0;
+float c2;        // lambda랑 같아서 나중에 할당
+const float dt = 0.01;
 
-SMCController smc(K, phi, c1, c2, dt);  // (O) 5개 인자
-
+SMCController smc(K, phi, c1, c2, dt);
 
 void setup() {
     pinMode(TRIG, OUTPUT);
@@ -46,75 +46,71 @@ void setup() {
 
     pinMode(START_BTN, INPUT_PULLUP);
 
-    loadTuning();               // EEPROM에서 마지막 λ, K 불러오기
+    loadTuning();
+    c2 = lambda;
     smc.setParameters(lambda, K, phi, dt);
 }
 
 void loop() {
-
-    // 0. 주행 시작 전 버튼 대기
     if(!started) {
-        if(digitalRead(START_BTN) == LOW) { // 버튼이 눌렸을 때 LOW
-            delay(50); // 디바운스
-            if(digitalRead(START_BTN) == LOW) { // 다시 확인
+        if(digitalRead(START_BTN) == LOW) {
+            delay(50);
+            if(digitalRead(START_BTN) == LOW) {
                 started = true;
-                Serial.println("=== 주행 시작 ===");
+                Serial.println(F("=== 주행 시작 ==="));
             }
         }
-        return; // 아직 시작 전이니 loop 빠져나감
+        return;
     }
 
-    // 1. 실시간 튜닝
-    lambda = analogRead(VR_L)/1023.0 * 2.0;   // 0~2 범위 예시
-    K = analogRead(VR_K)/1023.0 * 10.0;       // 0~10 범위 예시
+    // 실시간 튜닝
+    lambda = analogRead(VR_L)/1023.0 * 2.0;
+    K = analogRead(VR_K)/1023.0 * 10.0;
+    c2 = lambda;
     smc.setParameters(lambda, K, phi, dt);
 
-    // 2. 초음파 거리 측정 (30ms 간격)
-    unsigned long now = micros();
+    // 초음파 거리 측정 (30ms 간격)
+    uint32_t now = micros();
     float measured;
-    if (now - lastSensorRead > 30000) { // 30ms
+    if (now - lastSensorRead > 30000) {
         float raw = readDistance();
-        measured = 0.7*lastDistance + 0.3*raw;  // 간단 필터
+        measured = 0.7*lastDistance + 0.3*raw;
         lastDistance = measured;
         lastSensorRead = now;
 
-        // 3. 거리-시간 데이터 기록
+        // 기록
         if(recordIndex < MAX_RECORDS){
             records[recordIndex].t = millis();
-            records[recordIndex].distance = measured;
+            records[recordIndex].distance = (uint16_t)(measured * 10.0);  // 0.1cm 단위로 저장
             recordIndex++;
         }
     } else {
         measured = lastDistance;
     }
 
-    // 4. SMC 제어
+    // SMC 제어
     float control_pwm = smc.update(ref_distance, measured);
 
-    int base_pwm = 145; 
+    int base_pwm = 145;
     int pwm = base_pwm + (int)control_pwm;
     pwm = constrain(pwm, 0, 255);
 
     analogWrite(LEFT_PWM, pwm);
     analogWrite(RIGHT_PWM, pwm);
 
-    // 5. 시리얼 출력
-    Serial.print("dist = "); Serial.print(measured);
-    Serial.print("  pwm = "); Serial.print(pwm);
-    Serial.print("  lambda = "); Serial.print(lambda);
-    Serial.print("  K = "); Serial.println(K);
+    Serial.print(F("dist = ")); Serial.print(measured);
+    Serial.print(F("  pwm = ")); Serial.print(pwm);
+    Serial.print(F("  lambda = ")); Serial.print(lambda);
+    Serial.print(F("  K = ")); Serial.println(K);
 
-    // 6. 주행 종료 조건 (기록 배열 가득 찬 경우)
     if(recordIndex >= MAX_RECORDS){
-        Serial.println("=== 주행 종료: 기록 완료 ===");
-        printRecords();  // CSV 형태 출력
-        while(1){}        // 루프 멈춤
+        Serial.println(F("=== 주행 종료: 기록 완료 ==="));
+        printRecords();
+        while(1){}
     }
 
     delay(50);
 }
-
-// ================== 함수 정의 ==================
 
 float readDistance() {
     digitalWrite(TRIG, LOW);
@@ -125,7 +121,7 @@ float readDistance() {
 
     long duration = pulseIn(ECHO, HIGH, 30000);
     if(duration == 0) return lastDistance;
-    return duration * 0.0343 / 2.0; // cm
+    return duration * 0.0343 / 2.0;
 }
 
 void saveTuning(){
@@ -138,12 +134,11 @@ void loadTuning(){
     EEPROM.get(sizeof(lambda), K);
 }
 
-// 시리얼로 기록 데이터 확인
 void printRecords(){
-    Serial.println("time_ms,distance_cm");
-    for(int i=0; i<recordIndex; i++){
+    Serial.println(F("time_ms,distance_cm"));
+    for(uint8_t i=0; i<recordIndex; i++){
         Serial.print(records[i].t);
         Serial.print(",");
-        Serial.println(records[i].distance);
+        Serial.println(records[i].distance / 10.0, 1);  // float 형태로 출력, 소수 1자리
     }
 }
