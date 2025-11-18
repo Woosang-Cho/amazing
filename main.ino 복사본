@@ -10,10 +10,7 @@
 #define VR_L  A0  // λ 조절 가변저항
 #define VR_K  A1  // k 조절 가변저항
 
-#define MAX_RECORDS 128
-
-#define START_BTN 2
-bool started = false; // 주행 시작 플래그
+#define MAX_RECORDS 500
 
 struct Record {
     unsigned long t;
@@ -27,15 +24,12 @@ float ref_distance = 20.0;
 unsigned long lastSensorRead = 0;
 float lastDistance = 30.0;
 
-float lambda = 1.0;
-float K      = 30.0;
-float phi    = 0.5;
-float c1     = 1.0; 
-float c2     = lambda; 
-float dt     = 0.01;
+float lambda = 0.7;
+float K = 6.0;
+float phi = 0.1;
+float dt = 0.01;
 
-SMCController smc(K, phi, c1, c2, dt);  // (O) 5개 인자
-
+SMCController smc(lambda, K, phi, dt);
 
 void setup() {
     pinMode(TRIG, OUTPUT);
@@ -44,26 +38,11 @@ void setup() {
     pinMode(RIGHT_PWM, OUTPUT);
     Serial.begin(9600);
 
-    pinMode(START_BTN, INPUT_PULLUP);
-
     loadTuning();               // EEPROM에서 마지막 λ, K 불러오기
     smc.setParameters(lambda, K, phi, dt);
 }
 
 void loop() {
-
-    // 0. 주행 시작 전 버튼 대기
-    if(!started) {
-        if(digitalRead(START_BTN) == LOW) { // 버튼이 눌렸을 때 LOW
-            delay(50); // 디바운스
-            if(digitalRead(START_BTN) == LOW) { // 다시 확인
-                started = true;
-                Serial.println("=== 주행 시작 ===");
-            }
-        }
-        return; // 아직 시작 전이니 loop 빠져나감
-    }
-
     // 1. 실시간 튜닝
     lambda = analogRead(VR_L)/1023.0 * 2.0;   // 0~2 범위 예시
     K = analogRead(VR_K)/1023.0 * 10.0;       // 0~10 범위 예시
