@@ -12,8 +12,11 @@
 #define IN3 11
 #define IN4 12
 
+/*
 #define VR_L  A0
 #define VR_K  A1
+*/
+
 
 #define START_BTN 2
 bool started = false;
