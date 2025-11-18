@@ -7,32 +7,30 @@
 #define LEFT_PWM 5
 #define RIGHT_PWM 6
 
+#define IN1 3
+#define IN2 4
+#define IN3 11
+#define IN4 12
+
 #define VR_L  A0
 #define VR_K  A1
-
-#define MAX_RECORDS 96  // (더 줄일 수 있음)
 
 #define START_BTN 2
 bool started = false;
 
-struct Record {
-    uint32_t t;             // 시간(ms)
-    uint16_t distance;      // 0.1cm 단위
-};
+// ====== 최소 PWM 임계값 선언! (실험적으로 80~140 사이 값 조정) ======
+const int MIN_EFFECTIVE_PWM = 120; // 100~140 사이 여러 값 실험 후 맞춤
 
-Record records[MAX_RECORDS];
-uint8_t recordIndex = 0;    // 0~255면 충분 (uint8_t)
-
-float ref_distance = 20.0;
+float ref_distance = 6.0;
 uint32_t lastSensorRead = 0;
-float lastDistance = 30.0;
+float lastDistance = 20.0;
 
 // 튜닝 값
-float lambda;    // EEPROM에서 불러옴
-float K;         // EEPROM에서 불러옴
+float lambda;
+float K;
 const float phi = 0.5;
 const float c1  = 1.0;
-float c2;        // lambda랑 같아서 나중에 할당
+float c2;
 const float dt = 0.01;
 
 SMCController smc(K, phi, c1, c2, dt);
@@ -42,9 +40,19 @@ void setup() {
     pinMode(ECHO, INPUT);
     pinMode(LEFT_PWM, OUTPUT);
     pinMode(RIGHT_PWM, OUTPUT);
-    Serial.begin(9600);
 
+    pinMode(IN1, OUTPUT);
+    pinMode(IN2, OUTPUT);
+    pinMode(IN3, OUTPUT);
+    pinMode(IN4, OUTPUT);
+
+    Serial.begin(9600);
     pinMode(START_BTN, INPUT_PULLUP);
+
+    digitalWrite(IN1, HIGH);
+    digitalWrite(IN2, LOW);
+    digitalWrite(IN3, HIGH);
+    digitalWrite(IN4, LOW);
 
     loadTuning();
     c2 = lambda;
@@ -57,33 +65,25 @@ void loop() {
             delay(50);
             if(digitalRead(START_BTN) == LOW) {
                 started = true;
-                Serial.println(F("=== 주행 시작 ==="));
             }
         }
         return;
     }
 
-    // 실시간 튜닝
+    // 실시간 튜닝(가변저항)
     lambda = analogRead(VR_L)/1023.0 * 2.0;
     K = analogRead(VR_K)/1023.0 * 10.0;
     c2 = lambda;
     smc.setParameters(lambda, K, phi, dt);
 
-    // 초음파 거리 측정 (30ms 간격)
+    // 초음파 거리 측정 (30ms마다)
     uint32_t now = micros();
     float measured;
     if (now - lastSensorRead > 30000) {
         float raw = readDistance();
-        measured = 0.7*lastDistance + 0.3*raw;
+        measured = 0.6 * lastDistance + 0.4 * raw;
         lastDistance = measured;
         lastSensorRead = now;
-
-        // 기록
-        if(recordIndex < MAX_RECORDS){
-            records[recordIndex].t = millis();
-            records[recordIndex].distance = (uint16_t)(measured * 10.0);  // 0.1cm 단위로 저장
-            recordIndex++;
-        }
     } else {
         measured = lastDistance;
     }
@@ -91,25 +91,45 @@ void loop() {
     // SMC 제어
     float control_pwm = smc.update(ref_distance, measured);
 
-    int base_pwm = 145;
+    // ---- 최소 PWM 임계값을 적용한 감속 구간 코드 ----
+    int base_pwm;
+    if (measured > 20.0) {
+        base_pwm = 180;
+    } else if (measured > ref_distance) {
+        base_pwm = MIN_EFFECTIVE_PWM + (measured - ref_distance)/(12.0) * (180 - MIN_EFFECTIVE_PWM);
+        if (base_pwm < MIN_EFFECTIVE_PWM) base_pwm = 0; // 최소 이하 바로 정지
+    } else {
+        base_pwm = 0;
+    }
+
     int pwm = base_pwm + (int)control_pwm;
+    if (pwm < MIN_EFFECTIVE_PWM) pwm = 0; // 소리날 구간 즉시 정지
     pwm = constrain(pwm, 0, 255);
 
+    // 실제 모터 제어
     analogWrite(LEFT_PWM, pwm);
     analogWrite(RIGHT_PWM, pwm);
 
-    Serial.print(F("dist = ")); Serial.print(measured);
-    Serial.print(F("  pwm = ")); Serial.print(pwm);
-    Serial.print(F("  lambda = ")); Serial.print(lambda);
-    Serial.print(F("  K = ")); Serial.println(K);
+if(measured < 6.0) {
+    analogWrite(LEFT_PWM, 0);
+    analogWrite(RIGHT_PWM, 0);
+    delay(100);
 
-    if(recordIndex >= MAX_RECORDS){
-        Serial.println(F("=== 주행 종료: 기록 완료 ==="));
-        printRecords();
-        while(1){}
-    }
+    // 오른쪽 90도 회전
+    digitalWrite(IN1, HIGH);    // 왼쪽 앞으로
+    digitalWrite(IN2, LOW);
+    digitalWrite(IN3, LOW);     // 오른쪽 뒤로
+    digitalWrite(IN4, HIGH);
+    int turn_pwm = 150;
+    analogWrite(LEFT_PWM, turn_pwm);
+    analogWrite(RIGHT_PWM, turn_pwm);
+    delay(650); 
+    analogWrite(LEFT_PWM, 0);
+    analogWrite(RIGHT_PWM, 0);
 
-    delay(50);
+    while(1){} // 회전 끝나고 완전 정지
+}
+
 }
 
 float readDistance() {
@@ -132,13 +152,4 @@ void saveTuning(){
 void loadTuning(){
     EEPROM.get(0, lambda);
     EEPROM.get(sizeof(lambda), K);
-}
-
-void printRecords(){
-    Serial.println(F("time_ms,distance_cm"));
-    for(uint8_t i=0; i<recordIndex; i++){
-        Serial.print(records[i].t);
-        Serial.print(",");
-        Serial.println(records[i].distance / 10.0, 1);  // float 형태로 출력, 소수 1자리
-    }
 }
