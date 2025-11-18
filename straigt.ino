@@ -18,8 +18,8 @@
 #define START_BTN 2
 bool started = false;
 
-// ====== 최소 PWM 임계값 선언! (실험적으로 80~140 사이 값 조정) ======
-const int MIN_EFFECTIVE_PWM = 120; // 100~140 사이 여러 값 실험 후 맞춤
+// ====== 최소 PWM 임계값 (실험으로 80~140 조정) ======
+const int MIN_EFFECTIVE_PWM = 120; // 80~140 사이 여러 값 실험 후 맞춤
 
 float ref_distance = 6.0;
 uint32_t lastSensorRead = 0;
@@ -69,12 +69,14 @@ void loop() {
         }
         return;
     }
-
+/*
     // 실시간 튜닝(가변저항)
     lambda = analogRead(VR_L)/1023.0 * 2.0;
     K = analogRead(VR_K)/1023.0 * 10.0;
     c2 = lambda;
     smc.setParameters(lambda, K, phi, dt);
+*/
+
 
     // 초음파 거리 측정 (30ms마다)
     uint32_t now = micros();
@@ -106,7 +108,7 @@ void loop() {
     if (pwm < MIN_EFFECTIVE_PWM) pwm = 0; // 소리날 구간 즉시 정지
     pwm = constrain(pwm, 0, 255);
 
-    // 실제 모터 제어
+    // 모터 제어
     analogWrite(LEFT_PWM, pwm);
     analogWrite(RIGHT_PWM, pwm);
 
@@ -127,7 +129,7 @@ if(measured < 6.0) {
     analogWrite(LEFT_PWM, 0);
     analogWrite(RIGHT_PWM, 0);
 
-    while(1){} // 회전 끝나고 완전 정지
+    while(1){} // 회전 끝나고 정지
 }
 
 }
@@ -144,6 +146,7 @@ float readDistance() {
     return duration * 0.0343 / 2.0;
 }
 
+/*
 void saveTuning(){
     EEPROM.put(0, lambda);
     EEPROM.put(sizeof(lambda), K);
@@ -153,3 +156,5 @@ void loadTuning(){
     EEPROM.get(0, lambda);
     EEPROM.get(sizeof(lambda), K);
 }
+*/
+
