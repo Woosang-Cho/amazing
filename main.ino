@@ -34,13 +34,12 @@ const float LOOP_TIME = 0.05;    // 제어 루프 주기 (50ms)
 float K_front = 5.0;
 float lambda_front = 1.0;
 float phi_front = 0.5;
+const float TAU_FRONT = 0.02; // 종방향 LPF 시정수
 
 // 횡방향 SMC 파라미터
 float K_lat = 15.0;
 float lambda_lat = 1.5;
 float phi_lat = 1.0;
-
-const float TAU_FRONT = 0.02; // 종방향 LPF 시정수
 const float TAU_LAT = 0.02;   // 횡방향 LPF 시정수
 
 // SMC 컨트롤러 인스턴스 생성
