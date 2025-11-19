@@ -5,7 +5,7 @@
 
 class SMCController {
   public:
-    SMCController(float K_, float lambda_, float phi_, float dt_);
+    SMCController(float K_, float lambda_, float phi_, float dt_, float tau_);
 
     float update(float reference, float measured);
     
@@ -20,6 +20,7 @@ class SMCController {
     float lambda;
     float phi;
     float dt;
+    float tau;
     
     // 이전 오차 (미분값 계산용)
     float prev_error; 

@@ -40,9 +40,12 @@ float K_lat = 15.0;
 float lambda_lat = 1.5;
 float phi_lat = 1.0;
 
+const float TAU_FRONT = 0.02; // 종방향 LPF 시정수
+const float TAU_LAT = 0.02;   // 횡방향 LPF 시정수
+
 // SMC 컨트롤러 인스턴스 생성
-SMCController smcFront(K_front, lambda_front, phi_front, LOOP_TIME);
-SMCController smcLat(K_lat, lambda_lat, phi_lat, LOOP_TIME);
+SMCController smcFront(K_front, lambda_front, phi_front, LOOP_TIME, TAU_FRONT);
+SMCController smcLat(K_lat, lambda_lat, phi_lat, LOOP_TIME, TAU_LAT);
 
 // ==========================================
 // 3. 전역 변수

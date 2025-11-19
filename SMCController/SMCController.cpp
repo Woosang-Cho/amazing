@@ -5,9 +5,9 @@
 // 0.01s ~ 0.05s 사이에서 튜닝 고민
 const float TAU = 0.01; 
 
-SMCController::SMCController(float K_, float lambda_, float phi_, float dt_)
-  : K(K_), lambda(lambda_), phi(phi_), dt(dt_), prev_error(0.0), 
-    current_e_dot(0.0), current_s(0.0) {}
+SMCController::SMCController(float K_, float lambda_, float phi_, float dt_, float tau_)
+  : K(K_), lambda(lambda_), phi(phi_), dt(dt_), tau(tau_),
+    prev_error(0.0), current_e_dot(0.0), current_s(0.0) {}
 
 float SMCController::update(float reference, float measured) {
     float e = reference - measured;
@@ -16,7 +16,7 @@ float SMCController::update(float reference, float measured) {
     float raw_e_dot = (e - prev_error) / dt; 
 
     // 2. LPF 계수 (alpha) 계산
-    const float ALPHA = dt / (TAU + dt); 
+    const float ALPHA = dt / (tau + dt); 
     
     // 3. LPF 적용 (filtered_e_dot = alpha * raw_e_dot + (1 - alpha) * current_e_dot)
     // current_e_dot은 여기서 이전 필터링 결과(y[k-1])의 역할
