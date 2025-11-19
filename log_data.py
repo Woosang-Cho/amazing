@@ -8,28 +8,27 @@ import time
 # ====================================================================
 # [1] 설정 파라미터 변경 (총 12개 변수 수신)
 # ====================================================================
-SERIAL_PORT = '/dev/tty.usbmodem101'  # <<< 현재 아두이노가 연결된 포트
+SERIAL_PORT = '/dev/tty.usbmodem101'
 BAUD_RATE = 115200
-NUM_VARIABLES = 12 
+NUM_VARIABLES = 12 # 실제 SMC 변수 개수
 
-# CSV 파일 헤더
+# CSV 파일 헤더 (Time 컬럼 추가)
 VARIABLE_NAMES = [
+    "Time", # PC 수신 시각 추가
     "L_Dist", "R_Dist", "F_Dist", "ErrorLat", 
     "uFront", "uLat", "PWM_L", "PWM_R", 
     "ErrorLat_dot", "s_lat", "ErrorFront_dot", "s_front"
 ]
 
-# 로그 파일 이름 설정 (실행 시간으로 파일 이름 자동 생성)
+# 로그 파일 이름 설정
 LOG_FILENAME = f"smc_log_{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}.csv"
 
 # ====================================================================
 # [2] 초기화 및 연결
 # ====================================================================
 try:
-    # 타임아웃을 설정하여 ser.readline()이 무한정 대기하지 않도록 함
     ser = serial.Serial(SERIAL_PORT, BAUD_RATE, timeout=0.5) 
     print("Waiting for Arduino to reboot...")
-    # 아두이노 리셋 대기
     time.sleep(2) 
     print(f"Connected to {SERIAL_PORT} at {BAUD_RATE} baud. Starting log to {LOG_FILENAME}")
 except serial.SerialException as e:
@@ -49,28 +48,33 @@ try:
         csv_writer.writerow(VARIABLE_NAMES)
         csvfile.flush()
         
-        # 시리얼 버퍼에 남아있는 이전 데이터 비우기
+        # 시리얼 버퍼 비우기
         ser.reset_input_buffer() 
         
         print("Logging started. Press Ctrl+C to stop.")
         
         while True:
-            # 데이터가 있을 때만 읽음
             if ser.in_waiting > 0:
+                # readline()은 줄바꿈 문자를 기준으로 한 줄을 읽음
                 line = ser.readline().decode('utf-8').strip()
                 
+                # PC 수신 시각 기록
+                current_time = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S.%f')[:-3]
+
                 try:
                     # 쉼표로 분리하여 숫자 값으로 변환 시도
                     values = [float(v) for v in line.split(',')]
                     
                     if len(values) == NUM_VARIABLES:
                         
-                        # 1. 파일 로깅
-                        csv_writer.writerow(values)
-                        csvfile.flush() # 즉시 파일에 쓰기
+                        # 1. 파일 로깅 (시간 + 데이터)
+                        log_data = [current_time] + values
+                        csv_writer.writerow(log_data)
+                        csvfile.flush()
 
                 except ValueError:
-                    # 데이터 변환 오류(깨진 데이터)는 무시하고 다음 줄로 이동
+                    # 데이터 변환 오류(깨진 데이터)
+                    # print(f"Skipped corrupted line: {line}") # 디버깅 시 유용
                     pass
 
 except KeyboardInterrupt:

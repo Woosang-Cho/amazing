@@ -174,8 +174,10 @@ void loop() {
 
 
         // ----------------------------------
-        // 6. 시리얼 로깅 (12개 숫자 변수만 출력)
+        // 6. 시리얼 로깅 (12개 숫자 변수만 출력, 프레임 동기화 문자 추가)
         // ----------------------------------
+        Serial.print("<"); // 시작 문자
+        
         // 순서: L_Dist, R_Dist, F_Dist, ErrorLat, uFront, uLat, PWM_L, PWM_R, ErrorLat_dot, s_lat, ErrorFront_dot, s_front
         Serial.print(lastLeft); Serial.print(",");
         Serial.print(lastRight); Serial.print(",");
@@ -189,14 +191,15 @@ void loop() {
         Serial.print(smcLat.get_e_dot()); Serial.print(",");  
         Serial.print(smcLat.get_s()); Serial.print(",");       
         Serial.print(smcFront.get_e_dot()); Serial.print(","); 
-        Serial.println(smcFront.get_s());                       
+        Serial.print(smcFront.get_s()); // 마지막 값은 쉼표 없이
+
+        Serial.println(">"); // 종료 문자 (줄바꿈 포함)
     }
 }
 
 // ==========================================
-// 보조 함수 구현 
+// 보조 함수 구현 (생략)
 // ==========================================
-
 // 초음파 센서 거리 측정 함수 (타임아웃 20000us로 늘림)
 float readDistance(int trigPin, int echoPin) {
     digitalWrite(trigPin, LOW); delayMicroseconds(2);
@@ -205,8 +208,8 @@ float readDistance(int trigPin, int echoPin) {
     
     long duration = pulseIn(echoPin, HIGH, 20000); 
 
-    if (duration == 0) return 80.0; // 타임아웃 시 최대 유효 거리로 반환 (예시: 80cm)
-    return duration * 0.0343 / 2.0; // cm로 변환
+    if (duration == 0) return 80.0; 
+    return duration * 0.0343 / 2.0; 
 }
 
 void driveMotors(int leftSpeed, int rightSpeed) {
