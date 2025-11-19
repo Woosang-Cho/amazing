@@ -31,14 +31,14 @@ const float CELL_DISTANCE = 6.0; // 정지/감속 목표 거리 (cm)
 const float LOOP_TIME = 0.05;    // 제어 루프 주기 (50ms)
 
 // 종방향 SMC 파라미터
-float K_front = 3.0;
-float lambda_front = 0.7;
+float K_front = 5.0;
+float lambda_front = 1.0;
 float phi_front = 0.5;
 
 // 횡방향 SMC 파라미터
-float K_lat = 40.0;
+float K_lat = 15.0;
 float lambda_lat = 1.5;
-float phi_lat = 5.0;
+float phi_lat = 1.0;
 
 // SMC 컨트롤러 인스턴스 생성
 SMCController smcFront(K_front, lambda_front, phi_front, LOOP_TIME);
