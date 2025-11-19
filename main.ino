@@ -32,7 +32,7 @@ const float LOOP_TIME = 0.05;    // 제어 루프 주기 (50ms)
 const float PWM_MIXING_LIMIT = 50.0; // uLat이 적용될 최대 PWM 제한
 
 // 미로 탐색 종료 임계값 (전방/좌/우 모두 이 거리 이상이면 종료)
-const float EXIT_DISTANCE_THRESHOLD = 50.0; 
+const float EXIT_DISTANCE_THRESHOLD = 60.0; 
 
 // 종방향 SMC 파라미터 (전방 튜닝)
 float K_front = 5.0;

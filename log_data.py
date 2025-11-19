@@ -26,7 +26,7 @@ LOG_FILENAME = f"smc_log_{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}.csv
 # [2] 초기화 및 연결
 # ====================================================================
 try:
-    # 타임아웃을 설정하여 ser.readline()이 무한정 대기하지 않도록 합니다.
+    # 타임아웃을 설정하여 ser.readline()이 무한정 대기하지 않도록 함
     ser = serial.Serial(SERIAL_PORT, BAUD_RATE, timeout=0.5) 
     print("Waiting for Arduino to reboot...")
     # 아두이노 리셋 대기

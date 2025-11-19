@@ -6,7 +6,7 @@ import os
 # [1] 설정 (로그 파일 이름)
 # ====================================================================
 FILE_PATH = 'smc_log_YYYYMMDD_HHMMSS.csv' 
-TS = 0.05 # 제어 루프 주기 (50ms) -> 시간 계산의 기준이 됩니다.
+TS = 0.05 # 제어 루프 주기 (50ms)
 
 # 참고용 SMC 파라미터 
 LAMBDA_LAT = 'Arduino Setting' 
