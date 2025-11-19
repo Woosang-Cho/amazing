@@ -136,19 +136,21 @@ void loop() {
             driveMotors(pwmLeft, pwmRight);
         }
 
-        // ----------------------------------
-        // 6. 디버깅 출력 (시리얼 플로터 최적화)
-        // ----------------------------------
-        // 8가지 변수를 쉼표로 구분하여 한 줄에 출력합니다.
-        // 순서: L_Dist, R_Dist, F_Dist, uFront, uLat, PWM_L, PWM_R, ErrorLat
-        Serial.print(lastLeft); Serial.print(",");
-        Serial.print(lastRight); Serial.print(",");
-        Serial.print(lastFront); Serial.print(",");
-        Serial.print(uFront); Serial.print(",");
-        Serial.print(uLat); Serial.print(",");
-        Serial.print(pwmLeft); Serial.print(",");
-        Serial.print(pwmRight); Serial.print(",");
-        Serial.println(errorLat); // 마지막 변수는 println으로 줄바꿈
+      // 기존 8개 변수 출력
+    Serial.print(lastLeft); Serial.print(",");
+    Serial.print(lastRight); Serial.print(",");
+    Serial.print(lastFront); Serial.print(",");
+    Serial.print(errorLat); Serial.print(","); 
+    Serial.print(uFront); Serial.print(",");
+    Serial.print(uLat); Serial.print(",");
+    Serial.print(pwmLeft); Serial.print(",");
+    Serial.print(pwmRight); Serial.print(",");
+
+// 새로 추가된 4개 SMC 핵심 변수 출력 (Getter 함수 사용)
+    Serial.print(smcLat.get_e_dot()); Serial.print(",");  // 횡방향 e_dot (LPF 적용)
+    Serial.print(smcLat.get_s()); Serial.print(",");       // 횡방향 s
+    Serial.print(smcFront.get_e_dot()); Serial.print(","); // 종방향 e_dot (LPF 적용)
+    Serial.println(smcFront.get_s());                       // 종방향 s (마지막 변수는 println)
     }
 }
 
