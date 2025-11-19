@@ -3,7 +3,7 @@
 // LPF tau
 // 값이 작을수록 필터링이 강해져 노이즈가 줄지만, 응답 속도가 느려짐
 // 0.01s ~ 0.05s 사이에서 튜닝 고민
-const float TAU = 0.02; 
+const float TAU = 0.01; 
 
 SMCController::SMCController(float K_, float lambda_, float phi_, float dt_)
   : K(K_), lambda(lambda_), phi(phi_), dt(dt_), prev_error(0.0), 
