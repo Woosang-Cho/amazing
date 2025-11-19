@@ -31,6 +31,9 @@ const float CELL_DISTANCE = 6.0; // 정지 목표 거리 (cm)
 const float LOOP_TIME = 0.05;    // 제어 루프 주기 (50ms)
 const float PWM_MIXING_LIMIT = 50.0; // uLat이 적용될 최대 PWM 제한
 
+// 미로 탐색 종료 임계값 (전방/좌/우 모두 이 거리 이상이면 종료)
+const float EXIT_DISTANCE_THRESHOLD = 50.0; 
+
 // 종방향 SMC 파라미터 (전방 튜닝)
 float K_front = 5.0;
 float lambda_front = 1.0;
@@ -146,18 +149,32 @@ void loop() {
         int pwmRight = constrain(corrected_base_pwm - (int)uLat, 0, 255);
 
         // ----------------------------------
-        // 4. 전방 벽 감지 및 주행 (수정됨)
+        // 4. 전방 벽 감지 및 주행 
         // ----------------------------------
-        if (lastFront <= CELL_DISTANCE) { // SMC 목표 거리(6.0cm) 이하로 진입하면 멈추고 회전
+        if (lastFront <= CELL_DISTANCE) { // 6.0cm 이하로 진입하면 멈추고 회전
             stopMotors();
             currentState = TURNING; // 턴 상태로 진입
             turnStartTime = millis(); 
         } else {
             driveMotors(pwmLeft, pwmRight); // SMC 제어값으로 주행
         }
+        
+        // ----------------------------------
+        // 5. 미로 탐색 종료 조건 체크 (종료 메시지 제거)
+        // ----------------------------------
+        if (lastFront > EXIT_DISTANCE_THRESHOLD && 
+            lastLeft > EXIT_DISTANCE_THRESHOLD && 
+            lastRight > EXIT_DISTANCE_THRESHOLD) 
+        {
+            stopMotors();
+            while(1) {
+                // 영구 정지: 시리얼 통신을 포함한 모든 동작 중단
+            } 
+        }
+
 
         // ----------------------------------
-        // 5. 시리얼 로깅 (12개 변수)
+        // 6. 시리얼 로깅 (12개 숫자 변수만 출력)
         // ----------------------------------
         // 순서: L_Dist, R_Dist, F_Dist, ErrorLat, uFront, uLat, PWM_L, PWM_R, ErrorLat_dot, s_lat, ErrorFront_dot, s_front
         Serial.print(lastLeft); Serial.print(",");
@@ -208,7 +225,7 @@ void stopMotors() {
 // Non-Blocking 턴 동작 업데이트 함수
 bool updateTurnRight() {
     // 턴 동작 시간과 속도
-    const unsigned long TURN_DURATION = 550; // 이전에 잘 작동했던 550ms 또는 650ms로 튜닝 필요
+    const unsigned long TURN_DURATION = 550; // 튜닝된 값으로 설정
     const int TURN_SPEED = 160; 
 
     if (millis() - turnStartTime < TURN_DURATION) {
