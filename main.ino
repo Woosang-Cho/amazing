@@ -200,13 +200,13 @@ void loop() {
 // ==========================================
 // 보조 함수 구현 (생략)
 // ==========================================
-// 초음파 센서 거리 측정 함수 (타임아웃 20000us로 늘림)
+// 초음파 센서 거리 측정 함수 타임아웃 제어구간에 맞춰 조절 필요
 float readDistance(int trigPin, int echoPin) {
     digitalWrite(trigPin, LOW); delayMicroseconds(2);
     digitalWrite(trigPin, HIGH); delayMicroseconds(10);
     digitalWrite(trigPin, LOW);
     
-    long duration = pulseIn(echoPin, HIGH, 20000); 
+    long duration = pulseIn(echoPin, HIGH, 8000); 
 
     if (duration == 0) return 80.0; 
     return duration * 0.0343 / 2.0; 
