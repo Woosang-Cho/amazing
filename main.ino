@@ -1,128 +1,192 @@
-#include <EEPROM.h>
 #include "SMCController.h"
 
-#define TRIG 9
-#define ECHO 8
-
-#define LEFT_PWM 5
+// ==========================================
+// 1. 핀 설정
+// ==========================================
+// 모터 드라이버 핀
+#define LEFT_PWM  5
 #define RIGHT_PWM 6
+#define IN1 3
+#define IN2 4
+#define IN3 11
+#define IN4 12
 
-#define VR_L  A0  // λ 조절 가변저항
-#define VR_K  A1  // k 조절 가변저항
+// 초음파 센서 핀 (A0-A5를 디지털 I/O로 사용)
+#define TRIG_FRONT A0
+#define ECHO_FRONT A1
+#define TRIG_LEFT  A2
+#define ECHO_LEFT  A3
+#define TRIG_RIGHT A4
+#define ECHO_RIGHT A5
 
-#define MAX_RECORDS 500
+// 버튼
+#define START_BTN 2
 
-struct Record {
-    unsigned long t;
-    float distance;
-};
+// ==========================================
+// 2. 파라미터 설정 (튜닝 필요)
+// ==========================================
+// 기본 속도 및 제어 주기
+const int BASE_PWM = 120;        // 최소 주행 속도
+const float CELL_DISTANCE = 6.0; // 정지/감속 목표 거리 (cm)
+const float LOOP_TIME = 0.05;    // 제어 루프 주기 (50ms)
 
-Record records[MAX_RECORDS];
-int recordIndex = 0;
+// 종방향 SMC 파라미터
+float K_front = 3.0;
+float lambda_front = 0.7;
+float phi_front = 0.5;
 
-float ref_distance = 20.0;
-unsigned long lastSensorRead = 0;
-float lastDistance = 30.0;
+// 횡방향 SMC 파라미터
+float K_lat = 40.0;
+float lambda_lat = 1.5;
+float phi_lat = 5.0;
 
-float lambda = 0.7;
-float K = 6.0;
-float phi = 0.1;
-float dt = 0.01;
+// SMC 컨트롤러 인스턴스 생성
+SMCController smcFront(K_front, lambda_front, phi_front, LOOP_TIME);
+SMCController smcLat(K_lat, lambda_lat, phi_lat, LOOP_TIME);
 
-SMCController smc(lambda, K, phi, dt);
+// ==========================================
+// 3. 전역 변수
+// ==========================================
+bool started = false;
+float lastFront = 20.0;
+float lastLeft = 20.0;
+float lastRight = 20.0;
+unsigned long previousMillis = 0;
 
-void setup() {
-    pinMode(TRIG, OUTPUT);
-    pinMode(ECHO, INPUT);
-    pinMode(LEFT_PWM, OUTPUT);
-    pinMode(RIGHT_PWM, OUTPUT);
-    Serial.begin(9600);
+// 함수 프로토타입 선언
+float readDistance(int trigPin, int echoPin);
+void driveMotors(int leftSpeed, int rightSpeed);
+void stopMotors();
+void turnRight();
 
-    loadTuning();               // EEPROM에서 마지막 λ, K 불러오기
-    smc.setParameters(lambda, K, phi, dt);
+void setup() 
+{
+    // 시리얼 통신 시작
+    Serial.begin(115200);
+
+    // 모터 핀 초기화
+    pinMode(LEFT_PWM, OUTPUT); pinMode(RIGHT_PWM, OUTPUT);
+    pinMode(IN1, OUTPUT); pinMode(IN2, OUTPUT);
+    pinMode(IN3, OUTPUT); pinMode(IN4, OUTPUT);
+
+    // 초음파 핀 초기화
+    pinMode(TRIG_FRONT, OUTPUT); pinMode(ECHO_FRONT, INPUT);
+    pinMode(TRIG_LEFT, OUTPUT); pinMode(ECHO_LEFT, INPUT);
+    pinMode(TRIG_RIGHT, OUTPUT); pinMode(ECHO_RIGHT, INPUT);
+
+    // 버튼 핀 초기화
+    pinMode(START_BTN, INPUT_PULLUP);
+
+    // 시작 버튼 대기
+    while(digitalRead(START_BTN) == HIGH) {
+        // 대기 중
+    }
+    delay(500);
+    started = true;
 }
 
 void loop() {
-    // 1. 실시간 튜닝
-    lambda = analogRead(VR_L)/1023.0 * 2.0;   // 0~2 범위 예시
-    K = analogRead(VR_K)/1023.0 * 10.0;       // 0~10 범위 예시
-    smc.setParameters(lambda, K, phi, dt);
+    if (!started) return;
 
-    // 2. 초음파 거리 측정 (30ms 간격)
-    unsigned long now = micros();
-    float measured;
-    if (now - lastSensorRead > 30000) { // 30ms
-        float raw = readDistance();
-        measured = 0.7*lastDistance + 0.3*raw;  // 간단 필터
-        lastDistance = measured;
-        lastSensorRead = now;
+    unsigned long currentMillis = millis();
 
-        // 3. 거리-시간 데이터 기록
-        if(recordIndex < MAX_RECORDS){
-            records[recordIndex].t = millis();
-            records[recordIndex].distance = measured;
-            recordIndex++;
+    // 제어 루프 주기를 일정하게 유지
+    if (currentMillis - previousMillis >= (LOOP_TIME * 1000)) {
+        previousMillis = currentMillis;
+
+        // ----------------------------------
+        // 1. 센서 값 읽기 및 필터링
+        // ----------------------------------
+        float newFront = readDistance(TRIG_FRONT, ECHO_FRONT);
+        float newLeft  = readDistance(TRIG_LEFT, ECHO_LEFT);
+        float newRight = readDistance(TRIG_RIGHT, ECHO_RIGHT);
+
+        lastFront = 0.6 * lastFront + 0.4 * newFront;
+        lastLeft  = 0.6 * lastLeft  + 0.4 * newLeft;
+        lastRight = 0.6 * lastRight + 0.4 * newRight;
+
+        // ----------------------------------
+        // 2. SMC 제어 계산
+        // ----------------------------------
+        // uFront: 속도 조절 (부호 반전: 멀면 속도 UP)
+        float uFront = -smcFront.update(CELL_DISTANCE, lastFront);
+        
+        // uLat: 조향 조절 (Positive: 오른쪽 턴 필요)
+        float errorLat = lastLeft - lastRight; 
+        float uLat = smcLat.update(0, errorLat); 
+
+        // ----------------------------------
+        // 3. 모터 믹싱
+        // ----------------------------------
+        int corrected_base_pwm = constrain(BASE_PWM + (int)uFront, 0, 255);
+
+        // uLat 양수 -> 오른쪽 턴 -> Left UP, Right DOWN
+        int pwmLeft  = constrain(corrected_base_pwm + (int)uLat, 0, 255);
+        int pwmRight = constrain(corrected_base_pwm - (int)uLat, 0, 255);
+
+        // ----------------------------------
+        // 4. 전방 벽 감지 및 주행
+        // ----------------------------------
+        if (lastFront < 3.0) { 
+            stopMotors();
+            delay(200);     
+            turnRight();    
+            previousMillis = millis(); 
+        } else {
+            driveMotors(pwmLeft, pwmRight);
         }
-    } else {
-        measured = lastDistance;
+
+        // ----------------------------------
+        // 6. 디버깅 출력 (시리얼 플로터 최적화)
+        // ----------------------------------
+        // 8가지 변수를 쉼표로 구분하여 한 줄에 출력합니다.
+        // 순서: L_Dist, R_Dist, F_Dist, uFront, uLat, PWM_L, PWM_R, ErrorLat
+        Serial.print(lastLeft); Serial.print(",");
+        Serial.print(lastRight); Serial.print(",");
+        Serial.print(lastFront); Serial.print(",");
+        Serial.print(uFront); Serial.print(",");
+        Serial.print(uLat); Serial.print(",");
+        Serial.print(pwmLeft); Serial.print(",");
+        Serial.print(pwmRight); Serial.print(",");
+        Serial.println(errorLat); // 마지막 변수는 println으로 줄바꿈
     }
-
-    // 4. SMC 제어
-    float control_pwm = smc.update(ref_distance, measured);
-
-    int base_pwm = 145; 
-    int pwm = base_pwm + (int)control_pwm;
-    pwm = constrain(pwm, 0, 255);
-
-    analogWrite(LEFT_PWM, pwm);
-    analogWrite(RIGHT_PWM, pwm);
-
-    // 5. 시리얼 출력
-    Serial.print("dist = "); Serial.print(measured);
-    Serial.print("  pwm = "); Serial.print(pwm);
-    Serial.print("  lambda = "); Serial.print(lambda);
-    Serial.print("  K = "); Serial.println(K);
-
-    // 6. 주행 종료 조건 (기록 배열 가득 찬 경우)
-    if(recordIndex >= MAX_RECORDS){
-        Serial.println("=== 주행 종료: 기록 완료 ===");
-        printRecords();  // CSV 형태 출력
-        while(1){}        // 루프 멈춤
-    }
-
-    delay(50);
 }
 
-// ================== 함수 정의 ==================
+// ==========================================
+// 보조 함수 구현 (기존과 동일)
+// ==========================================
 
-float readDistance() {
-    digitalWrite(TRIG, LOW);
-    delayMicroseconds(2);
-    digitalWrite(TRIG, HIGH);
-    delayMicroseconds(10);
-    digitalWrite(TRIG, LOW);
+float readDistance(int trigPin, int echoPin) {
+    digitalWrite(trigPin, LOW); delayMicroseconds(2);
+    digitalWrite(trigPin, HIGH); delayMicroseconds(10);
+    digitalWrite(trigPin, LOW);
+    
+    long duration = pulseIn(echoPin, HIGH, 2500); 
 
-    long duration = pulseIn(ECHO, HIGH, 30000);
-    if(duration == 0) return lastDistance;
-    return duration * 0.0343 / 2.0; // cm
+    if (duration == 0) return 30.0;
+    return duration * 0.0343 / 2.0;
 }
 
-void saveTuning(){
-    EEPROM.put(0, lambda);
-    EEPROM.put(sizeof(lambda), K);
+void driveMotors(int leftSpeed, int rightSpeed) {
+    digitalWrite(IN1, HIGH); digitalWrite(IN2, LOW);
+    digitalWrite(IN3, HIGH); digitalWrite(IN4, LOW);
+    analogWrite(LEFT_PWM, leftSpeed);
+    analogWrite(RIGHT_PWM, rightSpeed);
 }
 
-void loadTuning(){
-    EEPROM.get(0, lambda);
-    EEPROM.get(sizeof(lambda), K);
+void stopMotors() {
+    digitalWrite(IN1, LOW); digitalWrite(IN2, LOW);
+    digitalWrite(IN3, LOW); digitalWrite(IN4, LOW);
+    analogWrite(LEFT_PWM, 0); analogWrite(RIGHT_PWM, 0);
 }
 
-// 시리얼로 기록 데이터 확인
-void printRecords(){
-    Serial.println("time_ms,distance_cm");
-    for(int i=0; i<recordIndex; i++){
-        Serial.print(records[i].t);
-        Serial.print(",");
-        Serial.println(records[i].distance);
-    }
+void turnRight() {
+    digitalWrite(IN1, HIGH); digitalWrite(IN2, LOW); 
+    digitalWrite(IN3, LOW);  digitalWrite(IN4, HIGH); 
+    int turnSpeed = 160; 
+    analogWrite(LEFT_PWM, turnSpeed);
+    analogWrite(RIGHT_PWM, turnSpeed);
+    delay(550); 
+    stopMotors();
+    delay(200); 
 }
