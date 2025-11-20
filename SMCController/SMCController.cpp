@@ -1,50 +1,85 @@
 #include "SMCController.h"
-#include <math.h>  // tanh 함수를 위해 추가 (챠터링 완화)
+#include <math.h> // tanh 함수 사용을 위해 포함
 
-// LPF tau 설명: 값이 작을수록 alpha = dt/(tau+dt) 크고 필터링 약해지지만 노이즈 통과 증가.
-// 응답 속도 vs 노이즈 trade-off: 0.01~0.05s 튜닝, Serial로 런타임 변경 
+// ==========================================
+// SMC/LPF 상태 변수 정의 (링커 오류 방지)
+// ==========================================
+float last_dist_lpf = 0.0;
+float last_error = 0.0;
+float last_e_dot_lpf = 0.0;
+float last_dist_raw = 0.0; 
+float last_s_value = 0.0;
 
-SMCController::SMCController(float K_, float lambda_, float phi_, float dt_, float tau_)
-  : K(K_), lambda(lambda_), phi(phi_), dt(dt_), tau(tau_),
-    prev_error(0.0), current_e_dot(0.0), current_s(0.0) {
-    // Optional: 초기 prev_error를 실제 첫 measured로 set하려면 main.ino에서 update 전 초기화 호출
-}
+// ==========================================
+// 유틸리티 함수
+// ==========================================
 
-float SMCController::update(float reference, float measured) {
-    float e = reference - measured;  // e <0: 목표 초과 (종방향: 벽 멀음)
-    
-    // 1. raw 오차 미분값 계산
-    float raw_e_dot = (e - prev_error) / dt; 
-
-    // 2. LPF 계수 계산
+// LPF 적용 함수
+float applyLPF(float raw_value, float last_lpf_value, float dt, float tau) {
+    // ALPHA = DT / (TAU + DT)
     const float ALPHA = dt / (tau + dt); 
-    
-    // 3. LPF 적용: current_e_dot 업데이트
-    current_e_dot = ALPHA * raw_e_dot + (1.0 - ALPHA) * current_e_dot; 
-
-    // 4. 슬라이딩 변수 s 계산
-    current_s = e + lambda * current_e_dot; 
-
-    // 5. sat_s 계산: tanh로 smoother (챠터링 완화)
-    float sat_s = tanh(current_s / phi);  // -1 ~ 1 범위
-    
-    // Optional: 동적 phi (e_dot 클 때 phi 증가, 과도 응답 완화)
-    // float dynamic_phi = phi + 0.1 * fabs(current_e_dot);
-    // float sat_s = tanh(current_s / dynamic_phi);
-
-    // 6. 제어 입력 u: -K * sat_s로 부호 맞춤 (e<0 → s<0 → sat_s<0 → u>0: 속도 증가/오른쪽 턴)
-    float u = -K * sat_s;
-
-    // 이전 오차 업데이트
-    prev_error = e;
-
-    return u;
+    return ALPHA * raw_value + (1.0 - ALPHA) * last_lpf_value;
 }
 
+// Chattering 감소를 위한 tanh 함수 기반 포화 함수 (Saturation function)
+float sgn_sat(float val, float phi) {
+    return tanh(val / phi); 
+}
+
+// ==========================================
+// SMCController 구현
+// ==========================================
+
+SMCController::SMCController(float K_, float lambda_, float phi_, float dt_, float tau_) 
+    : K(K_), lambda(lambda_), phi(phi_), dt(dt_), tau(tau_) {
+    
+    // 초기화
+    prev_error = 0.0; 
+    current_e_dot = 0.0; 
+    current_s = 0.0;
+}
+
+float SMCController::update(float reference, float measured_raw) {
+    // 0. Raw 거리 저장
+    last_dist_raw = measured_raw; 
+
+    // 1. Distance LPF 적용 (tau=0.040s 사용)
+    float dist_lpf = applyLPF(measured_raw, last_dist_lpf, dt, tau);
+    last_dist_lpf = dist_lpf;
+    
+    // 2. 오차 계산: e = 측정값 - 목표값
+    float error = dist_lpf - reference;
+    last_error = error;
+    
+    // 3. 오차 미분값 (e_dot) 계산 및 LPF 적용
+    float raw_e_dot = (error - prev_error) / dt;
+    float e_dot_lpf = applyLPF(raw_e_dot, last_e_dot_lpf, dt, tau);
+    last_e_dot_lpf = e_dot_lpf;
+    current_e_dot = e_dot_lpf;
+    
+    // 4. 슬라이딩 표면 계산: s = e_dot + lambda * e
+    float s = e_dot_lpf + lambda * error;
+    current_s = s;
+    last_s_value = s;
+
+    // 5. SMC 제어 신호 U (감속 정지 목표)
+    // U = -K * tanh(s / phi) : 
+    //   - e > 0 (벽에서 멀리 있음), e_dot < 0 (벽으로 접근 중)
+    //   - s < 0 일 때 (슬라이딩 표면 아래), U > 0 (가속해야 함)
+    //   - s > 0 일 때 (슬라이딩 표면 위), U < 0 (감속해야 함)
+    // 이 부호는 감속 정지 목표에 맞으며, main.ino에서 속도 계산에 사용됩니다.
+    float control_U = -K * sgn_sat(s, phi); 
+
+    // 6. 다음 루프를 위한 값 저장
+    prev_error = error;
+
+    return control_U;
+}
+
+// Getter 함수 구현
 float SMCController::get_e_dot() const {
-    return current_e_dot;
+    return current_e_dot; 
 }
-
 float SMCController::get_s() const {
-    return current_s;
+    return current_s;     
 }
