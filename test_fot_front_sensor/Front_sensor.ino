@@ -47,12 +47,6 @@ RobotState currentState = WAITING_TO_START;
 unsigned long last_loop_time = 0;
 unsigned long stop_timer = 0;
 
-float last_dist_raw = 0;
-float last_dist_lpf = 0;
-float last_error = 0;
-float last_e_dot_lpf = 0;
-float last_s_value = 0;
-
 int path_count = 0;
 int target_cells = 3;
 
@@ -122,9 +116,10 @@ void loop() {
         
         last_dist_raw = readDistance();
         
-        float measured[3] = {last_dist_raw, last_dist_lpf, last_error};
-        float u = smc.update(target_distance_cm, measured);
+        // FIXED: Pass single value directly (not array)
+        float u = smc.update(target_distance_cm, last_dist_raw);
         
+        // Get internal states from SMC using getter functions
         last_dist_lpf = smc.getFilteredDistance();
         last_error = smc.getError();
         last_e_dot_lpf = smc.getFilteredErrorRate();
