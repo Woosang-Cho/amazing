@@ -1,4 +1,4 @@
-// sensorF.ino - Modified for relative distance control
+// sensorF.ino - One cell at a time movement with specified total cells
 #include "SMCController.h"
 
 // ========================
@@ -17,12 +17,12 @@
 // ========================
 // 2. SMC & Control Constants
 // ========================
-const float LOOP_TIME = 0.05; // 50ms
+const float LOOP_TIME = 0.05;
 const int MAX_SPEED = 160;
 const int MIN_EFFECTIVE_PWM = 50;
-const float MAZE_CELL_SIZE = 20.0; // cm to advance per move
-const float REF_DISTANCE = 7.0; // minimum safe distance from wall
-const float DECEL_DIST = 15.0; // distance to start deceleration
+const float MAZE_CELL_SIZE = 20.0;
+const float REF_DISTANCE = 7.0;
+const float DECEL_DIST = 15.0;
 
 const float SMC_K = 4.0;
 const float SMC_LAMBDA = 0.2;
@@ -32,13 +32,18 @@ const float LPF_TAU = 0.04;
 SMCController smc(SMC_K, SMC_LAMBDA, SMC_PHI, LOOP_TIME, LPF_TAU);
 
 // ========================
-// 3. State Machine & Variables
+// 3. Mission Configuration
+// ========================
+const int TOTAL_CELLS = 3;  // CHANGE THIS: Total cells to advance
+
+// ========================
+// 4. State Machine & Variables
 // ========================
 enum RobotState { 
   WAITING_TO_START, 
   GO_STRAIGHT, 
   DECELERATE_AND_STOP, 
-  TURN_RIGHT, 
+  TURN_RIGHT_AND_STOP,
   STOPPED_FINAL 
 };
 
@@ -47,21 +52,17 @@ RobotState currentState = WAITING_TO_START;
 unsigned long last_loop_time = 0;
 unsigned long stop_timer = 0;
 
-int path_count = 0;
-int target_cells = 3;
-
-// Relative distance control variables
+int completed_cells = 0;
 float movement_start_distance = 0;
-bool distance_initialized = false;
 
 // ========================
-// 4. Function Declarations
+// 5. Function Declarations
 // ========================
 void setMotorSpeed(int left, int right);
 float readDistance();
 
 // ========================
-// 5. Setup
+// 6. Setup
 // ========================
 void setup() {
   Serial.begin(115200);
@@ -81,7 +82,7 @@ void setup() {
 }
 
 // ========================
-// 6. Main Loop
+// 7. Main Loop
 // ========================
 void loop() {
   switch(currentState) {
@@ -91,7 +92,6 @@ void loop() {
         delay(50);
         if (digitalRead(START_BTN) == LOW) {
           movement_start_distance = readDistance();
-          distance_initialized = true;
           currentState = GO_STRAIGHT;
         }
       }
@@ -99,6 +99,7 @@ void loop() {
       
     case GO_STRAIGHT:
       setMotorSpeed(MAX_SPEED, MAX_SPEED);
+      
       if (last_dist_lpf <= DECEL_DIST) {
         currentState = DECELERATE_AND_STOP;
       }
@@ -115,11 +116,8 @@ void loop() {
         last_loop_time = millis();
         
         last_dist_raw = readDistance();
-        
-        // FIXED: Pass single value directly (not array)
         float u = smc.update(target_distance_cm, last_dist_raw);
         
-        // Get internal states from SMC using getter functions
         last_dist_lpf = smc.getFilteredDistance();
         last_error = smc.getError();
         last_e_dot_lpf = smc.getFilteredErrorRate();
@@ -140,7 +138,7 @@ void loop() {
         Serial.print(last_e_dot_lpf, 2); Serial.print(",");
         Serial.print(last_s_value, 3); Serial.print(",");
         Serial.print(target_distance_cm, 2); Serial.print(",");
-        Serial.println("DECEL");
+        Serial.println("1");
         
         if (abs(last_dist_lpf - target_distance_cm) <= 1.0 && 
             abs(last_e_dot_lpf) < 0.5 && 
@@ -150,17 +148,15 @@ void loop() {
             stop_timer = millis();
           } else if (millis() - stop_timer >= 200) {
             setMotorSpeed(0, 0);
-            
-            path_count++;
-            target_cells--;
-            distance_initialized = false;
-            
-            if (target_cells <= 0) {
-              currentState = STOPPED_FINAL;
-            } else {
-              currentState = TURN_RIGHT;
-            }
+            completed_cells++;
             stop_timer = 0;
+            
+            if (completed_cells >= TOTAL_CELLS) {
+              currentState = TURN_RIGHT_AND_STOP;
+            } else {
+              movement_start_distance = readDistance();
+              currentState = GO_STRAIGHT;
+            }
           }
         } else {
           stop_timer = 0;
@@ -169,15 +165,11 @@ void loop() {
       break;
     }
       
-    case TURN_RIGHT:
+    case TURN_RIGHT_AND_STOP:
       setMotorSpeed(-100, 100);
       delay(650);
       setMotorSpeed(0, 0);
-      delay(100);
-      
-      movement_start_distance = readDistance();
-      distance_initialized = true;
-      currentState = GO_STRAIGHT;
+      currentState = STOPPED_FINAL;
       break;
       
     case STOPPED_FINAL:
@@ -202,13 +194,13 @@ void loop() {
       Serial.print(0.0); Serial.print(",");
       Serial.print(0.0); Serial.print(",");
       Serial.print(0.0); Serial.print(",");
-      Serial.println("STRAIGHT");
+      Serial.println("0");
     }
   }
 }
 
 // ========================
-// 7. Motor Control Function
+// 8. Motor Control Function
 // ========================
 void setMotorSpeed(int left, int right) {
   if (left > 0) {
@@ -241,7 +233,7 @@ void setMotorSpeed(int left, int right) {
 }
 
 // ========================
-// 8. Ultrasonic Sensor Function
+// 9. Ultrasonic Sensor Function
 // ========================
 float readDistance() {
   digitalWrite(TRIG_FRONT, LOW);
