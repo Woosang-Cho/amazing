@@ -18,6 +18,28 @@
 
 상한 이상으로 edge를 통과할 수 없도록 하면 loop가 제거된다. 
 
+## SMC 구현 과정 
+### SMC 개요
+Sliding Mode Control이란 외란에 강인하며 비선형 제어를 위해 고안된 제어 방법론으로, sliding surface를 정의하고 이에 error가 0으로 수렴하도록 한다. 즉, 
+
+$$\ddot{x} = f(x, t) + u(t) + d(t)$$
+라는 control input $u(t)$를 통해 disturbance $d(t)$를 없애고자 한다.
+$$ s(t) = \left(\frac{d}{dt} + \lambda \right)^{n-1} x$$
+
+위와 같이 sliding surface를 잡음. 
+
+대충 설명 추가 
+
+결국 control gain $K$로 에러에 수렴하는 강도를, design parameter $\lambda$를 통해 에러에 수렴하는 속도를 조절함과 동시에 chattering constant $\phi$를 통해 채터링을 억제해야 한다. 
+
+### 제어 목표 
+초음파 센서(HC-SR04)를 통해 미로에서의 한 칸(대략 20cm)을 정확하게 이동한다. 
+
+### 제어기 구성 
+SMC 라이브러리를 작성함. 초음파 센서의 튀는 값을 보정하기 위해 SMC 라이브러리 안에 LPF 기능을 함께 통합함. 적당한 실험을 통해 적당한 $\tau$ 값을 미리 찾음.(시리얼 모니터 이용)
+
+전진 테스트를 위해 전면 초음파 센서로 한 칸 이동에 대한 튜닝을 먼저 하고자 함. 
+
 ## 프로젝트 구성 
 
 이론 및 알고리즘

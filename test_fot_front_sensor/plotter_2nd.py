@@ -3,10 +3,6 @@ import matplotlib.pyplot as plt
 import numpy as np
 import sys
 
-# ==========================================
-# 설정
-# ==========================================
-# CSV_FILE = "robot_data_20251120_015800.csv"  # 파일명 직접 지정
 CSV_FILE = sys.argv[1] if len(sys.argv) > 1 else None  # 커맨드라인 인자
 
 if CSV_FILE is None:
