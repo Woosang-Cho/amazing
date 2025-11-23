@@ -16,14 +16,15 @@
 #define START_BTN 2
 
 // ========================
-// 2. SMC & 제어 상수
+// 2. 제어 상수
 // ========================
-const float LOOP_TIME = 0.05;       // 50ms
-const int MAX_SPEED = 160;
-const int MIN_EFFECTIVE_PWM = 50;   // SMC 적용 최소 PWM
-const float MAZE_CELL_SIZE = 20.0;  
-const float REF_DISTANCE = 5.0;     
-const float DECEL_DIST = 15.0;      
+const float LOOP_TIME = 0.05;       // 50ms 제어 루프
+const int MAX_SPEED = 160;           // 최대 PWM
+const int MIN_EFFECTIVE_PWM = 120;   // 모터 구동 최소 PWM
+
+const float MAZE_CELL_SIZE = 20.0;   // 미로 한 칸 거리 [cm]
+const float REF_DISTANCE = 5.0;      // SMC 목표 거리
+const float DECEL_DIST = 15.0;       // 감속 시작 거리
 
 const float SMC_K = 4.0;
 const float SMC_LAMBDA = 0.2;
@@ -40,18 +41,22 @@ RobotState currentState = WAITING_TO_START;
 
 unsigned long last_loop_time = 0;
 unsigned long stop_timer = 0;
-int path_count = 0;
-const int MAX_CELLS = 6;  // 최대 이동 칸 수
 
-// ========================
-// 4. 센서 읽기
-// ========================
+int path_count = 0;
+const int TARGET_CELLS = 10;  // 필요시 총 칸 수 조정 가능
+
+float remaining_distance = MAZE_CELL_SIZE; // 현재 칸 목표 거리
+
+// SMC 외부 변수
 extern float last_dist_raw;
 extern float last_dist_lpf;
 extern float last_error;
 extern float last_e_dot_lpf;
 extern float last_s_value;
 
+// ========================
+// 4. 센서 읽기
+// ========================
 float readDistance() {
     digitalWrite(TRIG_FRONT, LOW); delayMicroseconds(2);
     digitalWrite(TRIG_FRONT, HIGH); delayMicroseconds(10);
@@ -77,28 +82,7 @@ void setMotorSpeed(int left_pwm, int right_pwm) {
 }
 
 // ========================
-// 6. 시리얼 로그
-// ========================
-void logSerial(float target_distance) {
-    Serial.print(millis()/1000.0); Serial.print(",");
-    Serial.print(last_dist_raw); Serial.print(",");
-    Serial.print(last_dist_lpf); Serial.print(",");
-    Serial.print(last_error); Serial.print(",");
-    Serial.print(last_e_dot_lpf); Serial.print(",");
-    Serial.print(last_s_value); Serial.print(",");
-    Serial.print(target_distance); Serial.print(",");
-
-    switch(currentState){
-        case GO_STRAIGHT: Serial.println("GO"); break;
-        case DECELERATE_AND_STOP: Serial.println("SMC"); break;
-        case TURN_RIGHT: Serial.println("TURN"); break;
-        case STOPPED_FINAL: Serial.println("FINAL"); break;
-        default: Serial.println("WAIT"); break;
-    }
-}
-
-// ========================
-// 7. Setup
+// 6. Setup
 // ========================
 void setup() {
     pinMode(TRIG_FRONT, OUTPUT); pinMode(ECHO_FRONT, INPUT);
@@ -113,20 +97,22 @@ void setup() {
     last_dist_raw = last_dist_lpf = init_dist;
 
     last_loop_time = millis();
+
     Serial.println("time_sec,raw_dist_cm,lpf_dist_cm,error_cm,e_dot_lpf_cms,s_value,target_distance_cm,state");
 }
 
 // ========================
-// 8. Loop
+// 7. Loop
 // ========================
 void loop() {
     // 시작 버튼 대기
-    if(currentState == WAITING_TO_START) {
+    if(currentState == WAITING_TO_START){
         if(digitalRead(START_BTN) == LOW){
             delay(50);
             if(digitalRead(START_BTN) == LOW){
                 currentState = GO_STRAIGHT;
                 path_count = 0;
+                remaining_distance = MAZE_CELL_SIZE;
                 last_loop_time = millis();
             }
         }
@@ -134,42 +120,68 @@ void loop() {
     }
 
     // 제어 루프
-    if(millis()-last_loop_time >= (unsigned long)(LOOP_TIME*1000)){
+    if(millis() - last_loop_time >= (unsigned long)(LOOP_TIME*1000)){
         last_loop_time = millis();
 
         float measured = readDistance();
-        float target_distance = MAZE_CELL_SIZE; // 한 칸 목표
+        float u = smc.update(remaining_distance, measured); // 현재 칸 목표 거리 사용
 
-        // SMC 제어 입력
-        float u = smc.update(target_distance, measured);
+        // ========================
+        // 시리얼 출력 (기존 로거 호환)
+        // ========================
+        Serial.print(millis()/1000.0); Serial.print(",");
+        Serial.print(last_dist_raw); Serial.print(",");
+        Serial.print(last_dist_lpf); Serial.print(",");
+        Serial.print(last_error); Serial.print(",");
+        Serial.print(last_e_dot_lpf); Serial.print(",");
+        Serial.print(last_s_value); Serial.print(",");
+        Serial.print(remaining_distance); Serial.print(",");
+        switch(currentState){
+            case GO_STRAIGHT: Serial.println("GO"); break;
+            case DECELERATE_AND_STOP: Serial.println("SMC"); break;
+            case TURN_RIGHT: Serial.println("TURN"); break;
+            case STOPPED_FINAL: Serial.println("FINAL"); break;
+            default: Serial.println("WAIT"); break;
+        }
 
-        // PWM 변환 및 최소 PWM 보정
-        int pwm = (int)constrain(MAX_SPEED*(1.0+u)/2.0, 0, MAX_SPEED);
-        if(pwm>0 && pwm<MIN_EFFECTIVE_PWM) pwm = MIN_EFFECTIVE_PWM;
-
-        // 시리얼 로그
-        logSerial(target_distance);
-
+        // ========================
         // 상태 머신
+        // ========================
         switch(currentState){
             case GO_STRAIGHT:
-                setMotorSpeed(pwm,pwm);
+            {
+                int pwm = (int)constrain(MAX_SPEED*(1.0+u)/2.0, 0, MAX_SPEED);
+                if(pwm > 0 && pwm < MIN_EFFECTIVE_PWM) pwm = MIN_EFFECTIVE_PWM; // 최소 PWM 보장
+                setMotorSpeed(pwm, pwm);
+
+                // 감속 시작
                 if(last_dist_lpf <= DECEL_DIST) currentState = DECELERATE_AND_STOP;
                 break;
+            }
 
             case DECELERATE_AND_STOP:
-                setMotorSpeed(pwm,pwm);
-                if(last_dist_lpf <= target_distance + REF_DISTANCE && pwm <= MIN_EFFECTIVE_PWM+5){
-                    if(stop_timer==0) stop_timer=millis();
-                    else if(millis()-stop_timer>=150){
+            {
+                int pwm = (int)constrain(MAX_SPEED*(1.0+u)/2.0, 0, MAX_SPEED);
+                if(pwm > 0 && pwm < MIN_EFFECTIVE_PWM) pwm = MIN_EFFECTIVE_PWM;
+                setMotorSpeed(pwm, pwm);
+
+                // 목표 칸 도달 확인
+                if(last_dist_lpf <= remaining_distance + REF_DISTANCE && pwm <= MIN_EFFECTIVE_PWM){
+                    if(stop_timer == 0) stop_timer = millis();
+                    else if(millis() - stop_timer >= 150){
                         setMotorSpeed(0,0);
                         path_count++;
-                        stop_timer=0;
-                        if(path_count>=MAX_CELLS) currentState=STOPPED_FINAL;
-                        else currentState=TURN_RIGHT;
+                        if(path_count >= TARGET_CELLS) currentState = STOPPED_FINAL;
+                        else currentState = TURN_RIGHT;
+
+                        // 다음 칸 목표 거리 초기화
+                        remaining_distance = MAZE_CELL_SIZE;
+                        stop_timer = 0;
                     }
-                } else stop_timer=0;
+                } else stop_timer = 0;
+
                 break;
+            }
 
             case TURN_RIGHT:
                 setMotorSpeed(0,0); delay(50);
@@ -179,7 +191,9 @@ void loop() {
                 delay(650); // 90도 회전
                 analogWrite(LEFT_PWM,0); analogWrite(RIGHT_PWM,0);
                 delay(50);
-                currentState=GO_STRAIGHT;
+
+                currentState = GO_STRAIGHT;
+                remaining_distance = MAZE_CELL_SIZE;
                 break;
 
             case STOPPED_FINAL:
