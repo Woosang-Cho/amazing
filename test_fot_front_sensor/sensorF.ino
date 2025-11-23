@@ -20,7 +20,7 @@
 // ========================
 const float LOOP_TIME = 0.05;       // 50ms
 const int MAX_SPEED = 160;
-const int MIN_EFFECTIVE_PWM = 50;   // 최소 유효 PWM (모터 멈춤 방지)
+const int MIN_EFFECTIVE_PWM = 50;   // 최소 유효 PWM
 
 const float MAZE_CELL_SIZE = 20.0;  
 const float REF_DISTANCE = 7.0;     
@@ -43,7 +43,7 @@ unsigned long last_loop_time = 0;
 unsigned long stop_timer = 0;
 
 int path_count = 0;
-int target_cells = 0;  // 남은 칸 수, 한 번에 여러 칸 이동 가능
+int target_cells = 0;
 
 // ========================
 // 4. 센서 읽기
@@ -64,7 +64,7 @@ float readDistance() {
     if (duration == 0) return last_dist_raw;
 
     float dist = duration * 0.0343 / 2.0;
-    if (dist > 120.0) dist = 120.0;  // 최대 미로 거리
+    if (dist > 120.0) dist = 120.0;
     return dist;
 }
 
@@ -93,7 +93,6 @@ void setup() {
     last_dist_raw = last_dist_lpf = init_dist;
     last_loop_time = millis();
 
-    // 기존 로거와 호환되는 헤더
     Serial.println("time_sec,raw_dist_cm,lpf_dist_cm,error_cm,e_dot_lpf_cms,s_value,target_distance_cm,state");
 }
 
@@ -107,7 +106,7 @@ void loop() {
             if (digitalRead(START_BTN) == LOW) {
                 currentState = GO_STRAIGHT;
                 path_count = 0;
-                target_cells = 2;  // 예시: 앞으로 이동할 총 칸 수
+                target_cells = 2;  // 시작 예시
                 last_loop_time = millis();
             }
         }
@@ -116,14 +115,11 @@ void loop() {
 
     if (millis() - last_loop_time >= (unsigned long)(LOOP_TIME * 1000)) {
         last_loop_time = millis();
-
         float measured = readDistance();
-
-        // 목표 거리: 한 칸씩 이동
-        float target_distance_cm = MAZE_CELL_SIZE;  
+        float target_distance_cm = MAZE_CELL_SIZE;  // 한 칸씩 이동
         float u = smc.update(target_distance_cm, measured);
 
-        // 시리얼 출력 (로거 호환)
+        // 시리얼 출력
         Serial.print(millis() / 1000.0); Serial.print(",");
         Serial.print(last_dist_raw); Serial.print(",");
         Serial.print(last_dist_lpf); Serial.print(",");
