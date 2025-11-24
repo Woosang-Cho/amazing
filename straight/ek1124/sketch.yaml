@@ -1,0 +1,15 @@
+profiles:
+  profile-1763960695106:
+    fqbn: arduino:avr:uno
+    platforms:
+      - platform: arduino:avr (1.8.6)
+    libraries:
+      - dir: /Users/woosang/Documents/Arduino/libraries/SMCController
+    programmer: ""
+    port_config:
+      baudrate: "115200"
+      lineEnding: "\r\n"
+      bits: "8"
+      parity: none
+      stop_bits: "1"
+    port: /dev/cu.usbmodem1101

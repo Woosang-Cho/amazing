@@ -1,0 +1,3 @@
+time_sec,raw_dist_cm,lpf_dist_cm,error_cm,e_dot_lpf_cms,s_value,target_distance_cm,state
+10.22,12.78,14.17,0.00,0.00,0.00,7.00,0
+10.27,12.79,14.17,0.00,0.00,0.00,7.00,0

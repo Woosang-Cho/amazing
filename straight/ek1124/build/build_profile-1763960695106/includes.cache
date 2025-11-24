@@ -1,0 +1,97 @@
+[
+  {
+    "added_include_path": "/Users/woosang/Library/Arduino15/internal/arduino_avr_1.8.6_78e0815c6047bc54/cores/arduino"
+  },
+  {
+    "added_include_path": "/Users/woosang/Library/Arduino15/internal/arduino_avr_1.8.6_78e0815c6047bc54/variants/standard"
+  },
+  {
+    "added_include_path": "/Users/woosang/Documents/Arduino/libraries/SMCController"
+  },
+  {
+    "compile": {
+      "source_path": "/Users/woosang/Downloads/ek1123/ek1124/build/build_profile-1763960695106/sketch/ek1124.ino.cpp",
+      "object_path": "/Users/woosang/Downloads/ek1123/ek1124/build/build_profile-1763960695106/sketch/ek1124.ino.cpp.o",
+      "depfile_path": "/Users/woosang/Downloads/ek1123/ek1124/build/build_profile-1763960695106/sketch/ek1124.ino.cpp.d"
+    },
+    "compile_task": {
+      "args": [
+        "/Users/woosang/Library/Arduino15/internal/arduino_avr-gcc_7.3.0-atmel3.6.1-arduino7_fc423089e09cfcab/bin/avr-g++",
+        "-c",
+        "-g",
+        "-Os",
+        "-w",
+        "-std=gnu++11",
+        "-fpermissive",
+        "-fno-exceptions",
+        "-ffunction-sections",
+        "-fdata-sections",
+        "-fno-threadsafe-statics",
+        "-Wno-error=narrowing",
+        "-flto",
+        "-w",
+        "-x",
+        "c++",
+        "-E",
+        "-CC",
+        "-mmcu=atmega328p",
+        "-DF_CPU=16000000L",
+        "-DARDUINO=10607",
+        "-DARDUINO_AVR_UNO",
+        "-DARDUINO_ARCH_AVR",
+        "-I/Users/woosang/Library/Arduino15/internal/arduino_avr_1.8.6_78e0815c6047bc54/cores/arduino",
+        "-I/Users/woosang/Library/Arduino15/internal/arduino_avr_1.8.6_78e0815c6047bc54/variants/standard",
+        "-I/Users/woosang/Documents/Arduino/libraries/SMCController",
+        "/Users/woosang/Downloads/ek1123/ek1124/build/build_profile-1763960695106/sketch/ek1124.ino.cpp",
+        "-o",
+        "/dev/null"
+      ]
+    }
+  },
+  {
+    "missing_include_h": ""
+  },
+  {
+    "compile": {
+      "source_path": "/Users/woosang/Documents/Arduino/libraries/SMCController/SMCController.cpp",
+      "object_path": "/Users/woosang/Downloads/ek1123/ek1124/build/build_profile-1763960695106/libraries/SMCController/SMCController.cpp.o",
+      "depfile_path": "/Users/woosang/Downloads/ek1123/ek1124/build/build_profile-1763960695106/libraries/SMCController/SMCController.cpp.d"
+    },
+    "compile_task": {
+      "args": [
+        "/Users/woosang/Library/Arduino15/internal/arduino_avr-gcc_7.3.0-atmel3.6.1-arduino7_fc423089e09cfcab/bin/avr-g++",
+        "-c",
+        "-g",
+        "-Os",
+        "-w",
+        "-std=gnu++11",
+        "-fpermissive",
+        "-fno-exceptions",
+        "-ffunction-sections",
+        "-fdata-sections",
+        "-fno-threadsafe-statics",
+        "-Wno-error=narrowing",
+        "-flto",
+        "-w",
+        "-x",
+        "c++",
+        "-E",
+        "-CC",
+        "-mmcu=atmega328p",
+        "-DF_CPU=16000000L",
+        "-DARDUINO=10607",
+        "-DARDUINO_AVR_UNO",
+        "-DARDUINO_ARCH_AVR",
+        "-I/Users/woosang/Library/Arduino15/internal/arduino_avr_1.8.6_78e0815c6047bc54/cores/arduino",
+        "-I/Users/woosang/Library/Arduino15/internal/arduino_avr_1.8.6_78e0815c6047bc54/variants/standard",
+        "-I/Users/woosang/Documents/Arduino/libraries/SMCController",
+        "/Users/woosang/Documents/Arduino/libraries/SMCController/SMCController.cpp",
+        "-o",
+        "/dev/null"
+      ]
+    }
+  },
+  {
+    "missing_include_h": ""
+  }
+]
